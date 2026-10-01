@@ -16,11 +16,11 @@ def get_engine():
 
     url = URL.create(
         drivername="postgresql+psycopg",
-        username=os.environ["POSTGRES_USER"],  
+        username=os.environ["POSTGRES_USER"],
         password=os.environ["POSTGRES_PASSWORD"],
-        host=os.getenv("POSTGRES_HOST", "localhost"),  
+        host=os.getenv("POSTGRES_HOST", "localhost"),
         port=int(os.getenv("POSTGRES_PORT", "5432")),
-        database= os.environ["POSTGRES_DB"]
+        database=os.environ["POSTGRES_DB"]
     )
     return create_engine(url)
 
@@ -30,7 +30,6 @@ def load_raw_data(path: Path) -> pd.DataFrame:
 
     Başka temizlik yok, ham katmana dokunmuyoruz.
     """
-    
     df_dict = pd.read_excel(path, sheet_name=[0,1])
     df = pd.concat(df_dict.values(), ignore_index=True)
     df.columns = (
