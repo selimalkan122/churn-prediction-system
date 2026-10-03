@@ -395,6 +395,8 @@ FROM (
 --        Churn için önemli: tek alışverişli müşterilerin "alışveriş aralığı"
 --        yok. Bunlar churn tanımında ayrıca ele alınmalı (dahil edilip
 --        edilmeyecekleri churn penceresi kararıyla birlikte verilecek).
+--        → Karar: 02_churn_window.sql (N = 120, snapshot 2011-07-01).
+--          Alışverişleri snapshot'tan önceki 120 gün içindeyse dahil.
 
 
 -- S10: Ardışık alışverişler arasında kaç gün geçiyor?
@@ -447,6 +449,7 @@ WHERE gap_days IS NOT NULL;
 --        Churn için önemli: 90 günlük bir pencere normal aralıkların
 --        ~%10-25'ini yanlışlıkla churn sayabilir; 135+ gün daha temkinli.
 --        Kesin pencere seçimi bir sonraki adımda yapılacak.
+--        → Karar: 02_churn_window.sql (N = 120, snapshot 2011-07-01).
 
 
 -- =====================================================================
