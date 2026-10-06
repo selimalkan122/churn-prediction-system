@@ -63,7 +63,15 @@ SELECT
     ROUND(100.0 * AVG(churned), 2)   AS churn_pct
 FROM features.customer_snapshot;
 -- Sonuç:
--- Yorum:
+/*
+ n_customers | n_churned | churn_pct
+-------------+-----------+-----------
+        2313 |       823 |     35.58
+*/
+-- Yorum: 02'deki 2.315'ten 2 eksik: o 2 müşterinin pencerede sadece
+--        ürün olmayan satırı vardı (POST, M vb.), kural 3 onları attı.
+--        %35.58 churn → sınıflar dengesiz değil ama eşit de değil;
+--        "hep 0 de" diyen model %64 accuracy alır. Metrik ROC-AUC olmalı.
 
 
 -- S2: Sızıntı kontrolü. recency 1..120 arasında olmalı, tenure >= recency.
@@ -73,7 +81,14 @@ SELECT
     COUNT(*) FILTER (WHERE tenure_days < recency_days) AS bad_tenure
 FROM features.customer_snapshot;
 -- Sonuç:
--- Yorum:
+/*
+ min_recency | max_recency | bad_tenure
+-------------+-------------+------------
+           1 |         120 |          0
+*/
+-- Yorum: Sızıntı yok. recency >= 1 → snapshot günü ve sonrası feature'a
+--        girmemiş. recency <= 120 → herkes gerçekten aktif. bad_tenure = 0
+--        → ilk alışveriş hiçbir müşteride son alışverişten sonra değil.
 
 
 -- S3: Churn edenlerle etmeyenler feature'larda farklı mı?
@@ -87,4 +102,14 @@ SELECT
 FROM features.customer_snapshot
 GROUP BY churned;
 -- Sonuç:
--- Yorum:
+/*
+ churned |  n   | avg_recency | avg_frequency | avg_monetary | avg_tenure
+---------+------+-------------+---------------+--------------+------------
+       0 | 1490 |        39.6 |          11.1 |       5687.7 |      395.0
+       1 |  823 |        56.5 |           3.9 |       1413.0 |      298.8
+*/
+-- Yorum: Churn edenler daha uzun süredir gelmiyor (recency 56 vs 40),
+--        ~3 kat az fatura kesiyor (3.9 vs 11.1), ~4 kat az harcıyor
+--        (1.413 vs 5.688) ve daha yeni müşteri (tenure 299 vs 395).
+--        En güçlü ayrım frequency ve monetary'de. Feature'lar sinyal
+--        taşıyor → logistic regression'dan AUC > 0.5 bekliyoruz.
