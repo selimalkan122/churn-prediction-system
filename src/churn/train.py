@@ -1,5 +1,9 @@
-"""features.customer_snapshot üzerinde Dummy, LogReg ve RF eğitir, CV ile karşılaştırır."""
+"""features.customer_snapshot üzerinde Dummy, LogReg ve RF eğitir, CV ile karşılaştırır.
 
+Her model bir MLflow run'ı olarak kaydedilir (parametreler + metrikler).
+"""
+
+import mlflow
 import pandas as pd
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -23,6 +27,7 @@ TARGET = "churned"
 TEST_SIZE = 0.2
 RANDOM_STATE = 42
 CV_FOLDS = 5
+EXPERIMENT = "churn"
 
 
 def load_features(engine) -> pd.DataFrame:
@@ -63,20 +68,34 @@ def build_models() -> dict:
     }
 
 
-def evaluate(name: str, model, X_test, y_test) -> None:
-    """Test setinde accuracy ve ROC-AUC yazdırır."""
+def evaluate(name: str, model, X_test, y_test) -> dict:
+    """Test setinde accuracy ve ROC-AUC yazdırır ve döndürür."""
     y_pred = model.predict(X_test)  # sınıf: 0 ya da 1
     y_proba = model.predict_proba(X_test)[:, 1]  # churn olasılığı: 0.0 - 1.0
     acc = accuracy_score(y_test, y_pred)
     auc = roc_auc_score(y_test, y_proba)
-    print(f"{name:<10} accuracy: {acc:.4f}  ROC-AUC: {auc:.4f}")
+    print(f"{name:<10} test accuracy: {acc:.4f}  ROC-AUC: {auc:.4f}")
+    return {"test_accuracy": acc, "test_auc": auc}
 
 
-def cross_validate(name: str, model, X, y) -> None:
-    """Stratified k-fold CV ile ROC-AUC'nin ortalamasını ve std'sini yazdırır."""
+def cross_validate(name: str, model, X, y) -> dict:
+    """Stratified k-fold CV ile ROC-AUC'nin ortalamasını ve std'sini yazdırır ve döndürür."""
     cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
     scores = cross_val_score(model, X, y, cv=cv, scoring="roc_auc")
     print(f"{name:<10} CV ROC-AUC: {scores.mean():.4f} ± {scores.std():.4f}  {scores.round(3)}")
+    return {"cv_auc_mean": scores.mean(), "cv_auc_std": scores.std()}
+
+
+def model_params(model) -> dict:
+    """MLflow'a yazılacak parametreler: ortak ayarlar + modelin kendi ayarları."""
+    estimator = model[-1] if isinstance(model, Pipeline) else model  # Pipeline'da son adım
+    return {
+        "test_size": TEST_SIZE,
+        "random_state": RANDOM_STATE,
+        "cv_folds": CV_FOLDS,
+        "model_class": type(estimator).__name__,
+        **estimator.get_params(),
+    }
 
 
 def main() -> None:
@@ -87,11 +106,19 @@ def main() -> None:
     print(f"train: {X_train.shape}, churn oranı: {y_train.mean():.4f}")
     print(f"test:  {X_test.shape}, churn oranı: {y_test.mean():.4f}")
 
-    print("\n--- Test seti ---")
+    mlflow.set_experiment(EXPERIMENT)  # yoksa oluşturur
+
+    # Her model = bir run. CV sadece train setinde; test seti son kontrol.
     models = build_models()
     for name, model in models.items():
-        model.fit(X_train, y_train)
-        evaluate(name, model, X_test, y_test)
+        with mlflow.start_run(run_name=name):
+            model.fit(X_train, y_train)
+            print()
+            metrics = evaluate(name, model, X_test, y_test)
+            metrics |= cross_validate(name, model, X_train, y_train)
+
+            mlflow.log_params(model_params(model))
+            mlflow.log_metrics(metrics)
 
     # Katsayılar: + churn olasılığını artırır, - azaltır
     coefs = pd.Series(models["LogReg"]["model"].coef_[0], index=FEATURES)
@@ -99,12 +126,6 @@ def main() -> None:
 
     importances = pd.Series(models["RF"].feature_importances_, index=FEATURES)
     print(f"\nRF önemleri:\n{importances.sort_values(ascending=False)}")
-
-    # Cross-validation: tek bölünme yerine 5 bölünmede AUC. Sadece train seti;
-    # test seti son karar için dokunulmadan kalır.
-    print(f"\n--- {CV_FOLDS}-fold CV (train seti) ---")
-    for name, model in models.items():
-        cross_validate(name, model, X_train, y_train)
 
 
 if __name__ == "__main__":
