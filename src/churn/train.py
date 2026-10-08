@@ -30,6 +30,39 @@ def load_features(engine) -> pd.DataFrame:
     return pd.read_sql("SELECT * FROM features.customer_snapshot", engine)
 
 
+def split_data(df: pd.DataFrame):
+    """df'i stratified train/test olarak böler: X_train, X_test, y_train, y_test."""
+    return train_test_split(
+        df[FEATURES],
+        df[TARGET],
+        test_size=TEST_SIZE,
+        stratify=df[TARGET],  # iki tarafta da churn oranı aynı kalsın
+        random_state=RANDOM_STATE,  # her çalıştırmada aynı bölünme
+    )
+
+
+def build_models() -> dict:
+    """Karşılaştırılan modelleri eğitilmemiş halde döndürür."""
+    return {
+        # Baseline: hep çoğunluk sınıfını (0 = churn değil) tahmin eder
+        "Dummy": DummyClassifier(strategy="most_frequent"),
+        # Logistic regression: önce ölçekle, sonra sınıflandır
+        "LogReg": Pipeline(
+            [
+                ("scaler", StandardScaler()),
+                ("model", LogisticRegression(max_iter=1000)),
+            ]
+        ),
+        # Random forest: çok sayıda karar ağacının oylaması. Ölçekleme gerekmez.
+        "RF": RandomForestClassifier(
+            n_estimators=300,
+            min_samples_leaf=5,
+            random_state=RANDOM_STATE,
+            n_jobs=-1,
+        ),
+    }
+
+
 def evaluate(name: str, model, X_test, y_test) -> None:
     """Test setinde accuracy ve ROC-AUC yazdırır."""
     y_pred = model.predict(X_test)  # sınıf: 0 ya da 1
@@ -47,60 +80,30 @@ def cross_validate(name: str, model, X, y) -> None:
 
 
 def main() -> None:
-    engine = get_engine()
-    df = load_features(engine)
+    df = load_features(get_engine())
     print(f"df: {df.shape}, churn oranı: {df[TARGET].mean():.4f}")
 
-    X = df[FEATURES]
-    y = df[TARGET]
-    print(f"X: {X.shape}, y: {y.shape}")
-    print(X.head(3))
-    print(y.value_counts())
-    print(y.value_counts(normalize=True))
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=TEST_SIZE,
-        stratify=y,  # iki tarafta da churn oranı aynı kalsın
-        random_state=RANDOM_STATE,  # her çalıştırmada aynı bölünme
-    )
+    X_train, X_test, y_train, y_test = split_data(df)
     print(f"train: {X_train.shape}, churn oranı: {y_train.mean():.4f}")
     print(f"test:  {X_test.shape}, churn oranı: {y_test.mean():.4f}")
 
-    # Baseline: hep çoğunluk sınıfını (0 = churn değil) tahmin eder
-    dummy = DummyClassifier(strategy="most_frequent")
-    dummy.fit(X_train, y_train)
-    evaluate("Dummy", dummy, X_test, y_test)
-
-    # Logistic regression: önce ölçekle, sonra sınıflandır
-    logreg = Pipeline(
-        [
-            ("scaler", StandardScaler()),
-            ("model", LogisticRegression(max_iter=1000)),
-        ]
-    )
-    logreg.fit(X_train, y_train)
-    evaluate("LogReg", logreg, X_test, y_test)
+    print("\n--- Test seti ---")
+    models = build_models()
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+        evaluate(name, model, X_test, y_test)
 
     # Katsayılar: + churn olasılığını artırır, - azaltır
-    coefs = pd.Series(logreg["model"].coef_[0], index=FEATURES)
-    print(coefs.sort_values())
+    coefs = pd.Series(models["LogReg"]["model"].coef_[0], index=FEATURES)
+    print(f"\nLogReg katsayıları:\n{coefs.sort_values()}")
 
-    # Random forest: çok sayıda karar ağacının oylaması. Ölçekleme gerekmez.
-    rf = RandomForestClassifier(
-        n_estimators=300, min_samples_leaf=5, random_state=RANDOM_STATE, n_jobs=-1
-    )
-
-    rf.fit(X_train, y_train)
-    evaluate("RF", rf, X_test, y_test)
-
-    importances = pd.Series(rf.feature_importances_, index=FEATURES)
-    print(importances.sort_values(ascending=False))
+    importances = pd.Series(models["RF"].feature_importances_, index=FEATURES)
+    print(f"\nRF önemleri:\n{importances.sort_values(ascending=False)}")
 
     # Cross-validation: tek bölünme yerine 5 bölünmede AUC. Sadece train seti;
+    # test seti son karar için dokunulmadan kalır.
     print(f"\n--- {CV_FOLDS}-fold CV (train seti) ---")
-    for name, model in [("Dummy", dummy), ("LogReg", logreg), ("RF", rf)]:
+    for name, model in models.items():
         cross_validate(name, model, X_train, y_train)
 
 

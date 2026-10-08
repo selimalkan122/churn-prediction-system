@@ -1,15 +1,10 @@
 """Test setinde Dummy ve LogReg tahminlerini müşteri bazında inceler."""
 
 import pandas as pd
-from sklearn.dummy import DummyClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 
 from src.churn.ingest import get_engine
-from src.churn.train import FEATURES, RANDOM_STATE, TARGET, TEST_SIZE, load_features
+from src.churn.train import build_models, load_features, split_data
 
 SHOW_COLS = ["customer_id", "recency_days", "frequency", "monetary"]
 
@@ -23,22 +18,11 @@ def main() -> None:
     pd.set_option("display.width", 200)
 
     df = load_features(get_engine())
-    X, y = df[FEATURES], df[TARGET]
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=TEST_SIZE,
-        stratify=y,
-        random_state=RANDOM_STATE,  # train.py ile aynı bölünme
-    )
+    X_train, X_test, y_train, y_test = split_data(df)  # train.py ile aynı bölünme
 
-    dummy = DummyClassifier(strategy="most_frequent").fit(X_train, y_train)
-    logreg = Pipeline(
-        [
-            ("scaler", StandardScaler()),
-            ("model", LogisticRegression(max_iter=1000)),
-        ]
-    ).fit(X_train, y_train)
+    models = build_models()
+    dummy = models["Dummy"].fit(X_train, y_train)
+    logreg = models["LogReg"].fit(X_train, y_train)
 
     # Test müşterileri + iki modelin çıktısı + gerçek etiket
     out = df.loc[X_test.index, SHOW_COLS].copy()
