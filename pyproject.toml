@@ -11,3 +11,7 @@ select = [
     "B",   # bugbear (olası buglar)
     "UP",  # pyupgrade (eski Python sözdizimi)
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]  # testlerde "from src.churn..." import'u çalışsın
