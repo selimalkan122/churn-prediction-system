@@ -32,7 +32,7 @@ def load_features(engine) -> pd.DataFrame:
 
 def evaluate(name: str, model, X_test, y_test) -> None:
     """Test setinde accuracy ve ROC-AUC yazdırır."""
-    y_pred = model.predict(X_test)               # sınıf: 0 ya da 1
+    y_pred = model.predict(X_test)  # sınıf: 0 ya da 1
     y_proba = model.predict_proba(X_test)[:, 1]  # churn olasılığı: 0.0 - 1.0
     acc = accuracy_score(y_test, y_pred)
     auc = roc_auc_score(y_test, y_proba)
@@ -59,10 +59,11 @@ def main() -> None:
     print(y.value_counts(normalize=True))
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
+        X,
+        y,
         test_size=TEST_SIZE,
-        stratify=y,                  # iki tarafta da churn oranı aynı kalsın
-        random_state=RANDOM_STATE,   # her çalıştırmada aynı bölünme
+        stratify=y,  # iki tarafta da churn oranı aynı kalsın
+        random_state=RANDOM_STATE,  # her çalıştırmada aynı bölünme
     )
     print(f"train: {X_train.shape}, churn oranı: {y_train.mean():.4f}")
     print(f"test:  {X_test.shape}, churn oranı: {y_test.mean():.4f}")
@@ -73,10 +74,12 @@ def main() -> None:
     evaluate("Dummy", dummy, X_test, y_test)
 
     # Logistic regression: önce ölçekle, sonra sınıflandır
-    logreg = Pipeline([
-        ("scaler", StandardScaler()),
-        ("model", LogisticRegression(max_iter=1000)),
-    ])
+    logreg = Pipeline(
+        [
+            ("scaler", StandardScaler()),
+            ("model", LogisticRegression(max_iter=1000)),
+        ]
+    )
     logreg.fit(X_train, y_train)
     evaluate("LogReg", logreg, X_test, y_test)
 
@@ -86,10 +89,7 @@ def main() -> None:
 
     # Random forest: çok sayıda karar ağacının oylaması. Ölçekleme gerekmez.
     rf = RandomForestClassifier(
-        n_estimators=300,
-        min_samples_leaf=5,
-        random_state=RANDOM_STATE,
-        n_jobs=-1
+        n_estimators=300, min_samples_leaf=5, random_state=RANDOM_STATE, n_jobs=-1
     )
 
     rf.fit(X_train, y_train)

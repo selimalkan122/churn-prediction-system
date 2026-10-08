@@ -20,7 +20,7 @@ def get_engine():
         password=os.environ["POSTGRES_PASSWORD"],
         host=os.getenv("POSTGRES_HOST", "localhost"),
         port=int(os.getenv("POSTGRES_PORT", "5432")),
-        database=os.environ["POSTGRES_DB"]
+        database=os.environ["POSTGRES_DB"],
     )
     return create_engine(url)
 
@@ -30,20 +30,16 @@ def load_raw_data(path: Path) -> pd.DataFrame:
 
     Başka temizlik yok, ham katmana dokunmuyoruz.
     """
-    df_dict = pd.read_excel(path, sheet_name=[0,1])
+    df_dict = pd.read_excel(path, sheet_name=[0, 1])
     df = pd.concat(df_dict.values(), ignore_index=True)
     df.columns = (
-        df.columns
-        .str.strip()
-        .str.replace(r'[^\w\s]', '', regex=True)
+        df.columns.str.strip()
+        .str.replace(r"[^\w\s]", "", regex=True)
         .str.replace(r"(?<=[a-z])(?=[A-Z])", "_", regex=True)
         .str.lower()
         .str.replace(" ", "_")
     )
-    df = df.astype({
-            'invoice' : str,
-            'stock_code' : str
-        })
+    df = df.astype({"invoice": str, "stock_code": str})
     return df
 
 

@@ -1,0 +1,13 @@
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle hataları (boşluk, girinti)
+    "W",   # pycodestyle uyarıları (trailing whitespace)
+    "F",   # pyflakes (kullanılmayan import/değişken)
+    "I",   # isort (import sıralaması)
+    "B",   # bugbear (olası buglar)
+    "UP",  # pyupgrade (eski Python sözdizimi)
+]

@@ -25,17 +25,20 @@ def main() -> None:
     df = load_features(get_engine())
     X, y = df[FEATURES], df[TARGET]
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
+        X,
+        y,
         test_size=TEST_SIZE,
         stratify=y,
-        random_state=RANDOM_STATE,   # train.py ile aynı bölünme
+        random_state=RANDOM_STATE,  # train.py ile aynı bölünme
     )
 
     dummy = DummyClassifier(strategy="most_frequent").fit(X_train, y_train)
-    logreg = Pipeline([
-        ("scaler", StandardScaler()),
-        ("model", LogisticRegression(max_iter=1000)),
-    ]).fit(X_train, y_train)
+    logreg = Pipeline(
+        [
+            ("scaler", StandardScaler()),
+            ("model", LogisticRegression(max_iter=1000)),
+        ]
+    ).fit(X_train, y_train)
 
     # Test müşterileri + iki modelin çıktısı + gerçek etiket
     out = df.loc[X_test.index, SHOW_COLS].copy()
