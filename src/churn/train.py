@@ -1,13 +1,13 @@
-"""features.customer_snapshot üzerinde baseline ve logistic regression eğitir."""
+"""features.customer_snapshot üzerinde Dummy, LogReg ve RF eğitir, CV ile karşılaştırır."""
 
 import pandas as pd
 from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, roc_auc_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
 
 from src.churn.ingest import get_engine
 
@@ -22,6 +22,7 @@ FEATURES = [
 TARGET = "churned"
 TEST_SIZE = 0.2
 RANDOM_STATE = 42
+CV_FOLDS = 5
 
 
 def load_features(engine) -> pd.DataFrame:
@@ -36,6 +37,13 @@ def evaluate(name: str, model, X_test, y_test) -> None:
     acc = accuracy_score(y_test, y_pred)
     auc = roc_auc_score(y_test, y_proba)
     print(f"{name:<10} accuracy: {acc:.4f}  ROC-AUC: {auc:.4f}")
+
+
+def cross_validate(name: str, model, X, y) -> None:
+    """Stratified k-fold CV ile ROC-AUC'nin ortalamasını ve std'sini yazdırır."""
+    cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+    scores = cross_val_score(model, X, y, cv=cv, scoring="roc_auc")
+    print(f"{name:<10} CV ROC-AUC: {scores.mean():.4f} ± {scores.std():.4f}  {scores.round(3)}")
 
 
 def main() -> None:
@@ -89,6 +97,11 @@ def main() -> None:
 
     importances = pd.Series(rf.feature_importances_, index=FEATURES)
     print(importances.sort_values(ascending=False))
+
+    # Cross-validation: tek bölünme yerine 5 bölünmede AUC. Sadece train seti;
+    print(f"\n--- {CV_FOLDS}-fold CV (train seti) ---")
+    for name, model in [("Dummy", dummy), ("LogReg", logreg), ("RF", rf)]:
+        cross_validate(name, model, X_train, y_train)
 
 
 if __name__ == "__main__":
