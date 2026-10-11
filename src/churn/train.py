@@ -1,9 +1,11 @@
 """features.customer_snapshot üzerinde Dummy, LogReg ve RF eğitir, CV ile karşılaştırır.
 
 Her model bir MLflow run'ı olarak kaydedilir (parametreler + metrikler).
+Seçilen model (LogReg) ayrıca Model Registry'e "churn-model" adıyla eklenir.
 """
 
 import mlflow
+import mlflow.sklearn
 import pandas as pd
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -28,6 +30,8 @@ TEST_SIZE = 0.2
 RANDOM_STATE = 42
 CV_FOLDS = 5
 EXPERIMENT = "churn"
+SELECTED_MODEL = "LogReg"  # CV ile seçilen model
+REGISTERED_MODEL = "churn-model"  # Model Registry'deki adı
 
 
 def load_features(engine) -> pd.DataFrame:
@@ -119,6 +123,15 @@ def main() -> None:
 
             mlflow.log_params(model_params(model))
             mlflow.log_metrics(metrics)
+
+            # Sadece seçilen modeli kaydet: run'a dosya olarak + Registry'e isimle
+            if name == SELECTED_MODEL:
+                mlflow.sklearn.log_model(
+                    model,
+                    name="model",
+                    registered_model_name=REGISTERED_MODEL,
+                    input_example=X_train.head(5),  # API girdisinin şeklini (signature) çıkarır
+                )
 
     # Katsayılar: + churn olasılığını artırır, - azaltır
     coefs = pd.Series(models["LogReg"]["model"].coef_[0], index=FEATURES)
