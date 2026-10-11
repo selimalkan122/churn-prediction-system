@@ -9,5 +9,18 @@ services:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
 
+  api:
+    build: .
+    container_name: churn-api
+    ports:
+      - "8000:8000"
+    environment:
+      # MLflow modelin yerini mutlak yolla kaydetti → container'da da aynı yol olmalı
+      MLFLOW_TRACKING_URI: sqlite:///${PWD}/mlflow.db
+    volumes:
+      - ${PWD}/mlflow.db:${PWD}/mlflow.db
+      - ${PWD}/mlruns:${PWD}/mlruns
+    restart: unless-stopped
+
 volumes:
   pgdata:
